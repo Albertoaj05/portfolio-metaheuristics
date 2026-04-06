@@ -1,0 +1,6 @@
+lambda=500
+num_ejecuciones=50
+eval_random=10000
+eval_bl=10000
+eval_greedy=1
+semilla_inicial=42

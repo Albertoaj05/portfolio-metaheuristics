@@ -1,0 +1,93 @@
+PRÁCTICA 1 - METAHEURÍSTICAS
+Problema del Portfolio
+Curso 2025-2026
+
+Contenido de la carpeta software
+--------------------------------
+
+- common/
+  Contiene los ficheros base del framework proporcionado para la práctica.
+
+- datos_portfolio_2526/
+  Incluye los tres conjuntos de datos usados en los experimentos:
+  ibex_35.csv, syp_100.csv y syp_500.csv.
+
+- inc/
+  Contiene las cabeceras de las clases y algoritmos implementados:
+  portfolio.h, greedy.h, localsearch.h y randomsearch.h.
+
+- src/
+  Contiene la implementación del problema y de los algoritmos:
+  portfolio.cpp, greedy.cpp y localsearch.cpp.
+
+- resultados/
+  Contiene los ficheros CSV generados con los resultados medios y los datos
+  usados para construir los boxplots.
+
+- graficas/
+  Contiene las imágenes PNG de los boxplots generados para cada dataset.
+
+- main.cpp
+  Programa principal que ejecuta los experimentos de la práctica.
+
+- boxplots.py
+  Script en Python para generar los boxplots a partir de los ficheros CSV
+  guardados en la carpeta resultados.
+
+- config.txt
+  Fichero de configuración opcional. Si no se proporciona, el programa usa
+  por defecto los valores pedidos en el guion de la práctica:
+  lambda=500, 50 ejecuciones, 10000 evaluaciones para Random y BL,
+  1 evaluación para Greedy y semilla inicial 42.
+
+- CMakeLists.txt
+  Fichero de configuración para compilar el proyecto con CMake.
+
+Compilación
+-----------
+
+Desde la carpeta software:
+
+mkdir build
+cd build
+cmake ..
+make
+
+Ejecución
+---------
+
+Si el programa se ha compilado con CMake (usando build), el ejecutable se
+encuentra en la carpeta build. En este caso, debe ejecutarse desde la carpeta
+software para que las rutas funcionen correctamente:
+
+./build/main
+
+(opcionalmente con configuración)
+./build/main config.txt
+
+Si se compila directamente sin CMake:
+
+g++ -std=c++17 -O3 main.cpp src/*.cpp -Icommon -Iinc -o main
+
+el ejecutable se genera en la carpeta software, y se ejecuta directamente con:
+
+./main
+./main config.txt
+
+Tras ejecutar el programa se generan en la carpeta resultados:
+- resultados_medias.csv
+- semillas_utilizadas.csv
+- configuracion_usada.txt
+- boxplot_ibex_35.csv
+- boxplot_syp_100.csv
+- boxplot_syp_500.csv
+
+Generación de gráficas
+----------------------
+
+Una vez generados los CSV de resultados, los boxplots se obtienen ejecutando:
+
+python3 boxplots.py
+
+Las imágenes se guardan en la carpeta graficas.
+
