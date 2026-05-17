@@ -7,13 +7,16 @@
 #include <chrono>
 #include <stdexcept>
 #include <map>
+#include <cmath>
 
 #include "portfolio.h"
+#include "portfolio_convergencia.h"
 #include "randomsearch.h"
 #include "greedy.h"
 #include "localsearch.h"
+#include "genetic.h"
+#include "memetic.h"
 #include "random.hpp"
-
 using namespace std;
 using namespace std::chrono;
 
@@ -50,16 +53,24 @@ struct ResultadoMedio {
     double evaluaciones = 0.0;
 };
 
+struct ResultadoExtra {
+    string dataset;
+    string algoritmo;
+    ResultadoMedio media;
+};
+
 struct ConfiguracionExperimento {
     double lambda = 500.0;
     int num_ejecuciones = 50;
     int eval_random = 10000;
     int eval_bl = 10000;
     int eval_greedy = 1;
+    int eval_ag = 10000;
+    int eval_am = 10000;
     int semilla_inicial = 42;
 };
 
-// Quita espacios al principio y al final
+// Limpia espacios al leer pares clave=valor del fichero de configuración.
 string trim(const string& s) {
     size_t ini = s.find_first_not_of(" \t\r\n");
     if (ini == string::npos) return "";
@@ -67,7 +78,7 @@ string trim(const string& s) {
     return s.substr(ini, fin - ini + 1);
 }
 
-// Lee fichero de configuración opcional
+// Lee parámetros opcionales desde un fichero de configuración.
 ConfiguracionExperimento leerConfiguracion(const string& fichero_config) {
     ConfiguracionExperimento cfg;
     ifstream file(fichero_config);
@@ -94,13 +105,15 @@ ConfiguracionExperimento leerConfiguracion(const string& fichero_config) {
         else if (clave == "eval_random") cfg.eval_random = stoi(valor);
         else if (clave == "eval_bl") cfg.eval_bl = stoi(valor);
         else if (clave == "eval_greedy") cfg.eval_greedy = stoi(valor);
+        else if (clave == "eval_ag") cfg.eval_ag = stoi(valor);
         else if (clave == "semilla_inicial") cfg.semilla_inicial = stoi(valor);
+        else if (clave == "eval_am") cfg.eval_am = stoi(valor);
     }
 
     return cfg;
 }
 
-// Lee del CSV solo las filas entre dos fechas
+// Carga solo las filas de un intervalo de fechas, usado para evaluar 2025.
 DatosPeriodo cargarPeriodoCSV(const string& fichero, const string& fecha_inicio, const string& fecha_fin) {
     DatosPeriodo datos;
     ifstream file(fichero);
@@ -110,7 +123,7 @@ DatosPeriodo cargarPeriodoCSV(const string& fichero, const string& fecha_inicio,
     }
 
     string line;
-    getline(file, line); // saltamos cabecera
+    getline(file, line);
 
     while (getline(file, line)) {
         if (line.empty()) continue;
@@ -137,7 +150,7 @@ DatosPeriodo cargarPeriodoCSV(const string& fichero, const string& fecha_inicio,
     return datos;
 }
 
-// Calcula beneficio interno y covarianza para un periodo
+// Calcula beneficio acumulado y covarianzas para el periodo de test.
 MetricasPeriodo calcularMetricasPeriodo(const DatosPeriodo& datos) {
     MetricasPeriodo metricas;
 
@@ -181,7 +194,7 @@ MetricasPeriodo calcularMetricasPeriodo(const DatosPeriodo& datos) {
     return metricas;
 }
 
-// Evalúa una solución usando las métricas de un periodo concreto
+// Evalúa una solución ya obtenida sobre otro periodo de datos.
 pair<double, double> evaluarSolucionEnPeriodo(
     const tSolution<double>& w,
     const MetricasPeriodo& metricas,
@@ -204,11 +217,17 @@ pair<double, double> evaluarSolucionEnPeriodo(
         }
     }
 
+    if (riesgo < 0.0 && fabs(riesgo) < 1e-12) {
+        riesgo = 0.0;
+    }
+
+    riesgo = sqrt(riesgo);
+
     double fitness = beneficio - lambda * riesgo;
     return {fitness, beneficio};
 }
 
-// Calcula la media de todas las ejecuciones
+// Promedia las repeticiones de un mismo algoritmo.
 ResultadoMedio calcularMedia(const vector<ResultadoEjecucion>& runs) {
     ResultadoMedio medias;
 
@@ -222,7 +241,8 @@ ResultadoMedio calcularMedia(const vector<ResultadoEjecucion>& runs) {
         medias.evaluaciones += runs[i].evaluaciones;
     }
 
-    const double total = (double)runs.size();
+    double total = (double)runs.size();
+
     medias.fitness_2015_2024 /= total;
     medias.fitness_2025 /= total;
     medias.beneficio_2025 /= total;
@@ -232,65 +252,39 @@ ResultadoMedio calcularMedia(const vector<ResultadoEjecucion>& runs) {
     return medias;
 }
 
-// Imprime por pantalla la tabla resumen de un dataset
-void imprimirTablaDataset(const string& nombre_dataset,
-                          const ResultadoMedio& greedy,
-                          const ResultadoMedio& random,
-                          const ResultadoMedio& bl) {
-    cout << "\n=============================================================\n";
-    cout << "Resultados de " << nombre_dataset << " (medias)\n";
-    cout << "=============================================================\n";
-
+// Imprime una fila de la tabla principal.
+void imprimirFila(const string& nombre, const ResultadoMedio& m) {
     cout << left
-         << setw(12) << "Algoritmo"
-         << setw(15) << "2015-2024"
-         << setw(15) << "2025 Fit."
-         << setw(15) << "2025 Benef."
-         << setw(15) << "Evaluaciones"
-         << setw(12) << "Tiempo(s)"
+         << setw(12) << nombre
+         << setw(15) << m.fitness_2015_2024
+         << setw(15) << m.fitness_2025
+         << setw(15) << m.beneficio_2025
+         << setw(15) << m.evaluaciones
+         << setw(12) << m.tiempo_seg
          << "\n";
-
-    cout << fixed << setprecision(3);
-
-    auto imprimirFila = [](const string& nombre, const ResultadoMedio& m) {
-        cout << left
-             << setw(12) << nombre
-             << setw(15) << m.fitness_2015_2024
-             << setw(15) << m.fitness_2025
-             << setw(15) << m.beneficio_2025
-             << setw(15) << m.evaluaciones
-             << setw(12) << m.tiempo_seg
-             << "\n";
-    };
-
-    imprimirFila("Greedy", greedy);
-    imprimirFila("Random", random);
-    imprimirFila("BL", bl);
 }
 
 int main(int argc, char* argv[]) {
     try {
-        // Si no se pasa ningún fichero, usamos exactamente los valores por defecto de la práctica
         ConfiguracionExperimento cfg;
 
-        // Si se pasa un fichero de configuración, lo leemos
         if (argc >= 2) {
             cfg = leerConfiguracion(argv[1]);
         }
 
+        // Datasets y límites de inversión usados en los experimentos.
         vector<ConfiguracionDataset> datasets = {
             {"Ibex 35", "datos_portfolio_2526/ibex_35.csv", 0.005, 0.08, "resultados/boxplot_ibex_35.csv"},
             {"S&P 100", "datos_portfolio_2526/syp_100.csv", 0.005, 0.05, "resultados/boxplot_syp_100.csv"},
             {"S&P 500", "datos_portfolio_2526/syp_500.csv", 0.005, 0.02, "resultados/boxplot_syp_500.csv"}
         };
 
-        // Generamos las semillas a partir de la semilla inicial
+        // Semillas consecutivas para que las ejecuciones sean reproducibles.
         vector<int> semillas;
         for (int i = 0; i < cfg.num_ejecuciones; i++) {
             semillas.push_back(cfg.semilla_inicial + i);
         }
 
-        // Guardamos las semillas usadas
         ofstream semillas_csv("resultados/semillas_utilizadas.csv");
         if (!semillas_csv.is_open()) {
             throw runtime_error("No se pudo crear resultados/semillas_utilizadas.csv");
@@ -302,7 +296,6 @@ int main(int argc, char* argv[]) {
         }
         semillas_csv.close();
 
-        // Guardamos también la configuración usada
         ofstream config_csv("resultados/configuracion_usada.txt");
         if (!config_csv.is_open()) {
             throw runtime_error("No se pudo crear resultados/configuracion_usada.txt");
@@ -313,6 +306,8 @@ int main(int argc, char* argv[]) {
         config_csv << "eval_random=" << cfg.eval_random << "\n";
         config_csv << "eval_bl=" << cfg.eval_bl << "\n";
         config_csv << "eval_greedy=" << cfg.eval_greedy << "\n";
+        config_csv << "eval_ag=" << cfg.eval_ag << "\n";
+        config_csv << "eval_am=" << cfg.eval_am << "\n";
         config_csv << "semilla_inicial=" << cfg.semilla_inicial << "\n";
         config_csv.close();
 
@@ -324,10 +319,47 @@ int main(int argc, char* argv[]) {
         resumen_csv << "dataset,algoritmo,fitness_2015_2024,fitness_2025,beneficio_2025,evaluaciones,tiempo_seg\n";
         resumen_csv << fixed << setprecision(6);
 
+        // Algoritmos obligatorios y variantes extra que se muestran aparte.
         RandomSearch<double> randomAlg;
         GreedySearch greedyAlg;
         LocalSearch blAlg;
 
+        GeneticAlgorithm aggArit("AGG", "ARIT");
+        GeneticAlgorithm aggBlx("AGG", "BLX");
+        GeneticAlgorithm ageArit("AGE", "ARIT");
+        GeneticAlgorithm ageBlx("AGE", "BLX");
+        GeneticAlgorithm aggUnif("AGG", "UNIF");
+        GeneticAlgorithm ageUnif("AGE", "UNIF");
+        MemeticAlgorithm amAll("ALL", "BLX");
+        MemeticAlgorithm amRand("RAND", "BLX");
+        MemeticAlgorithm amBest("BEST", "BLX");
+        MemeticAlgorithm amBest1("BEST1", "BLX");
+
+        vector<pair<string, GeneticAlgorithm*>> algoritmos_geneticos = {
+            {"AGG-Arit", &aggArit},
+            {"AGG-BLX", &aggBlx},
+            {"AGE-Arit", &ageArit},
+            {"AGE-BLX", &ageBlx}
+        };
+
+        vector<pair<string, GeneticAlgorithm*>> algoritmos_geneticos_extra = {
+            {"AGG-Unif", &aggUnif},
+            {"AGE-Unif", &ageUnif}
+        };
+
+        vector<pair<string, MemeticAlgorithm*>> algoritmos_memeticos = {
+            {"AM-All", &amAll},
+            {"AM-Rand", &amRand},
+            {"AM-Best", &amBest}
+        };
+
+        vector<pair<string, MemeticAlgorithm*>> algoritmos_memeticos_extra = {
+            {"AM-Best1", &amBest1} 
+        };
+
+        vector<ResultadoExtra> resultados_extra;
+
+        // Ejecutamos todos los algoritmos sobre cada dataset.
         for (size_t d = 0; d < datasets.size(); d++) {
             ConfiguracionDataset ds = datasets[d];
 
@@ -335,16 +367,19 @@ int main(int argc, char* argv[]) {
             cout << "DATASET: " << ds.nombre << "\n";
             cout << "##################################################\n";
 
-            // Conjunto de entrenamiento: 2015-2024
             Portfolio portfolio_train(ds.fichero, ds.lo, ds.hi, cfg.lambda);
 
-            // Conjunto de evaluación: 2025
+            // 2025 se calcula aparte para medir cómo generaliza cada solución.
             DatosPeriodo datos_2025 = cargarPeriodoCSV(ds.fichero, "2025-01-01", "2025-12-31");
             MetricasPeriodo metricas_2025 = calcularMetricasPeriodo(datos_2025);
 
             vector<ResultadoEjecucion> runs_greedy;
             vector<ResultadoEjecucion> runs_random;
             vector<ResultadoEjecucion> runs_bl;
+            map<string, vector<ResultadoEjecucion>> runs_geneticos;
+            map<string, vector<ResultadoEjecucion>> runs_memeticos;
+            map<string, vector<ResultadoEjecucion>> runs_geneticos_extra;
+            map<string, vector<ResultadoEjecucion>> runs_memeticos_extra;
 
             ofstream boxplot_csv(ds.fichero_boxplot);
             if (!boxplot_csv.is_open()) {
@@ -354,10 +389,10 @@ int main(int argc, char* argv[]) {
             boxplot_csv << "algoritmo,fitness_2015_2024\n";
             boxplot_csv << fixed << setprecision(6);
 
+            // En cada repetición se usa la misma semilla para todos los algoritmos.
             for (int rep = 0; rep < cfg.num_ejecuciones; rep++) {
                 int semilla = semillas[rep];
 
-                // RANDOM
                 Random::seed(semilla);
                 auto inicio_r = high_resolution_clock::now();
                 auto res_r = randomAlg.optimize(portfolio_train, cfg.eval_random);
@@ -375,7 +410,6 @@ int main(int argc, char* argv[]) {
                 runs_random.push_back(r1);
                 boxplot_csv << "Random," << r1.fitness_2015_2024 << "\n";
 
-                // GREEDY
                 Random::seed(semilla);
                 auto inicio_g = high_resolution_clock::now();
                 auto res_g = greedyAlg.optimize(portfolio_train, cfg.eval_greedy);
@@ -393,7 +427,6 @@ int main(int argc, char* argv[]) {
                 runs_greedy.push_back(r2);
                 boxplot_csv << "Greedy," << r2.fitness_2015_2024 << "\n";
 
-                // BL
                 Random::seed(semilla);
                 auto inicio_b = high_resolution_clock::now();
                 auto res_b = blAlg.optimize(portfolio_train, cfg.eval_bl);
@@ -410,6 +443,93 @@ int main(int argc, char* argv[]) {
 
                 runs_bl.push_back(r3);
                 boxplot_csv << "BL," << r3.fitness_2015_2024 << "\n";
+
+                for (auto& alg : algoritmos_geneticos) {
+                    string nombre_alg = alg.first;
+                    GeneticAlgorithm* algoritmo = alg.second;
+
+                    Random::seed(semilla);
+                    auto inicio = high_resolution_clock::now();
+                    auto res = algoritmo->optimize(portfolio_train, cfg.eval_ag);
+                    auto fin = high_resolution_clock::now();
+
+                    ResultadoEjecucion r;
+                    r.tiempo_seg = duration<double>(fin - inicio).count();
+                    r.fitness_2015_2024 = res.fitness;
+                    r.evaluaciones = res.evaluations;
+
+                    auto eval = evaluarSolucionEnPeriodo(res.solution, metricas_2025, cfg.lambda);
+                    r.fitness_2025 = eval.first;
+                    r.beneficio_2025 = eval.second;
+
+                    runs_geneticos[nombre_alg].push_back(r);
+                    boxplot_csv << nombre_alg << "," << r.fitness_2015_2024 << "\n";
+                }
+                for (auto& alg : algoritmos_memeticos) {
+                    string nombre_alg = alg.first;
+                    MemeticAlgorithm* algoritmo = alg.second;
+
+                    Random::seed(semilla);
+                    auto inicio = high_resolution_clock::now();
+                    auto res = algoritmo->optimize(portfolio_train, cfg.eval_am);
+                    auto fin = high_resolution_clock::now();
+
+                    ResultadoEjecucion r;
+                    r.tiempo_seg = duration<double>(fin - inicio).count();
+                    r.fitness_2015_2024 = res.fitness;
+                    r.evaluaciones = res.evaluations;
+
+                    auto eval = evaluarSolucionEnPeriodo(res.solution, metricas_2025, cfg.lambda);
+                    r.fitness_2025 = eval.first;
+                    r.beneficio_2025 = eval.second;
+
+                    runs_memeticos[nombre_alg].push_back(r);
+                    boxplot_csv << nombre_alg << "," << r.fitness_2015_2024 << "\n";
+                }
+
+                for (auto& alg : algoritmos_geneticos_extra) {
+                    string nombre_alg = alg.first;
+                    GeneticAlgorithm* algoritmo = alg.second;
+
+                    Random::seed(semilla);
+                    auto inicio = high_resolution_clock::now();
+                    auto res = algoritmo->optimize(portfolio_train, cfg.eval_ag);
+                    auto fin = high_resolution_clock::now();
+
+                    ResultadoEjecucion r;
+                    r.tiempo_seg = duration<double>(fin - inicio).count();
+                    r.fitness_2015_2024 = res.fitness;
+                    r.evaluaciones = res.evaluations;
+
+                    auto eval = evaluarSolucionEnPeriodo(res.solution, metricas_2025, cfg.lambda);
+                    r.fitness_2025 = eval.first;
+                    r.beneficio_2025 = eval.second;
+
+                    runs_geneticos_extra[nombre_alg].push_back(r);
+                    boxplot_csv << nombre_alg << "," << r.fitness_2015_2024 << "\n";
+                }
+
+                for (auto& alg : algoritmos_memeticos_extra) {
+                    string nombre_alg = alg.first;
+                    MemeticAlgorithm* algoritmo = alg.second;
+
+                    Random::seed(semilla);
+                    auto inicio = high_resolution_clock::now();
+                    auto res = algoritmo->optimize(portfolio_train, cfg.eval_am);
+                    auto fin = high_resolution_clock::now();
+
+                    ResultadoEjecucion r;
+                    r.tiempo_seg = duration<double>(fin - inicio).count();
+                    r.fitness_2015_2024 = res.fitness;
+                    r.evaluaciones = res.evaluations;
+
+                    auto eval = evaluarSolucionEnPeriodo(res.solution, metricas_2025, cfg.lambda);
+                    r.fitness_2025 = eval.first;
+                    r.beneficio_2025 = eval.second;
+
+                    runs_memeticos_extra[nombre_alg].push_back(r);
+                    boxplot_csv << nombre_alg << "," << r.fitness_2015_2024 << "\n";
+                }
             }
 
             boxplot_csv.close();
@@ -418,7 +538,25 @@ int main(int argc, char* argv[]) {
             ResultadoMedio media_random = calcularMedia(runs_random);
             ResultadoMedio media_bl = calcularMedia(runs_bl);
 
-            imprimirTablaDataset(ds.nombre, media_greedy, media_random, media_bl);
+            // Tabla principal con los algoritmos obligatorios.
+            cout << "\n=============================================================\n";
+            cout << "Resultados de " << ds.nombre << " (medias)\n";
+            cout << "=============================================================\n";
+
+            cout << left
+                 << setw(12) << "Algoritmo"
+                 << setw(15) << "2015-2024"
+                 << setw(15) << "2025 Fit."
+                 << setw(15) << "2025 Benef."
+                 << setw(15) << "Evaluaciones"
+                 << setw(12) << "Tiempo(s)"
+                 << "\n";
+
+            cout << fixed << setprecision(3);
+
+            imprimirFila("Greedy", media_greedy);
+            imprimirFila("Random", media_random);
+            imprimirFila("BL", media_bl);
 
             resumen_csv << ds.nombre << ",Greedy,"
                         << media_greedy.fitness_2015_2024 << ","
@@ -440,9 +578,281 @@ int main(int argc, char* argv[]) {
                         << media_bl.beneficio_2025 << ","
                         << media_bl.evaluaciones << ","
                         << media_bl.tiempo_seg << "\n";
+
+            for (auto& par : runs_geneticos) {
+                string nombre_alg = par.first;
+                ResultadoMedio media = calcularMedia(par.second);
+
+                imprimirFila(nombre_alg, media);
+
+                resumen_csv << ds.nombre << "," << nombre_alg << ","
+                            << media.fitness_2015_2024 << ","
+                            << media.fitness_2025 << ","
+                            << media.beneficio_2025 << ","
+                            << media.evaluaciones << ","
+                            << media.tiempo_seg << "\n";
+            }
+
+            for (auto& par : runs_memeticos) {
+                string nombre_alg = par.first;
+                ResultadoMedio media = calcularMedia(par.second);
+
+                imprimirFila(nombre_alg, media);
+
+                resumen_csv << ds.nombre << "," << nombre_alg << ","
+                            << media.fitness_2015_2024 << ","
+                            << media.fitness_2025 << ","
+                            << media.beneficio_2025 << ","
+                            << media.evaluaciones << ","
+                            << media.tiempo_seg << "\n";
+            }
+
+            for (auto& par : runs_geneticos_extra) {
+                ResultadoExtra extra;
+                extra.dataset = ds.nombre;
+                extra.algoritmo = par.first;
+                extra.media = calcularMedia(par.second);
+                resultados_extra.push_back(extra);
+            }
+
+            for (auto& par : runs_memeticos_extra) {
+                ResultadoExtra extra;
+                extra.dataset = ds.nombre;
+                extra.algoritmo = par.first;
+                extra.media = calcularMedia(par.second);
+                resultados_extra.push_back(extra);
+            }
         }
 
         resumen_csv.close();
+
+        cout << "\n##################################################\n";
+        cout << "EXPERIMENTOS EXTRA\n";
+        cout << "##################################################\n";
+
+        // Las variantes voluntarias se separan de la tabla principal.
+        for (size_t d = 0; d < datasets.size(); d++) {
+            ConfiguracionDataset ds = datasets[d];
+
+            cout << "\n=============================================================\n";
+            cout << "Uniforme y AM-Best1 en " << ds.nombre << " (medias)\n";
+            cout << "=============================================================\n";
+            cout << left
+                 << setw(12) << "Algoritmo"
+                 << setw(15) << "2015-2024"
+                 << setw(15) << "2025 Fit."
+                 << setw(15) << "2025 Benef."
+                 << setw(15) << "Evaluaciones"
+                 << setw(12) << "Tiempo(s)"
+                 << "\n";
+            cout << fixed << setprecision(3);
+
+            for (size_t i = 0; i < resultados_extra.size(); i++) {
+                ResultadoExtra extra = resultados_extra[i];
+                if (extra.dataset != ds.nombre) continue;
+
+                cout << left
+                     << setw(12) << extra.algoritmo
+                     << setw(15) << extra.media.fitness_2015_2024
+                     << setw(15) << extra.media.fitness_2025
+                     << setw(15) << extra.media.beneficio_2025
+                     << setw(15) << extra.media.evaluaciones
+                     << setw(12) << extra.media.tiempo_seg
+                     << "\n";
+            }
+        }
+
+        // Se generan los CSV necesarios para dibujar las curvas de convergencia.
+        GeneticAlgorithm aggBlxConv("AGG", "BLX");
+        MemeticAlgorithm amBestConv("BEST", "BLX");
+
+        for (size_t d = 0; d < datasets.size(); d++) {
+            ConfiguracionDataset ds = datasets[d];
+
+            string sufijo;
+            if (ds.nombre == "Ibex 35") sufijo = "ibex_35";
+            else if (ds.nombre == "S&P 100") sufijo = "syp_100";
+            else sufijo = "syp_500";
+
+            ofstream conv_csv("resultados/convergencia_" + sufijo + ".csv");
+            if (!conv_csv.is_open()) {
+                throw runtime_error("No se pudo crear convergencia_" + sufijo + ".csv");
+            }
+            conv_csv << "algoritmo,evaluaciones,fitness\n";
+            conv_csv << fixed << setprecision(6);
+
+            int semilla_conv = cfg.semilla_inicial;
+
+            // Cada bloque escribe la evolución del mejor fitness hasta ese punto.
+            Random::seed(semilla_conv);
+            {
+                PortfolioConvergencia portfolio_random(ds.fichero, ds.lo, ds.hi, cfg.lambda, conv_csv, "Random");
+                randomAlg.optimize(portfolio_random, cfg.eval_random);
+            }
+
+            Random::seed(semilla_conv);
+            {
+                PortfolioConvergencia portfolio_bl(ds.fichero, ds.lo, ds.hi, cfg.lambda, conv_csv, "BL");
+                blAlg.optimize(portfolio_bl, cfg.eval_bl);
+            }
+
+            Random::seed(semilla_conv);
+            {
+                PortfolioConvergencia portfolio_agg(ds.fichero, ds.lo, ds.hi, cfg.lambda, conv_csv, "AGG-BLX");
+                aggBlxConv.optimize(portfolio_agg, cfg.eval_ag);
+            }
+
+            Random::seed(semilla_conv);
+            {
+                PortfolioConvergencia portfolio_am(ds.fichero, ds.lo, ds.hi, cfg.lambda, conv_csv, "AM-Best");
+                amBestConv.optimize(portfolio_am, cfg.eval_am);
+            }
+
+            conv_csv.close();
+        }
+        // Sensibilidad de alpha en BLX usando AGG-BLX.
+        vector<double> alphas = {0.1, 0.3, 0.5};
+
+        ofstream alpha_csv("resultados/sensibilidad_alpha.csv");
+        if (!alpha_csv.is_open()) {
+            throw runtime_error("No se pudo crear sensibilidad_alpha.csv");
+        }
+        alpha_csv << "dataset,alpha,fitness_medio,fitness_2025_medio,tiempo_seg\n";
+        alpha_csv << fixed << setprecision(6);
+
+        for (size_t d = 0; d < datasets.size(); d++) {
+            ConfiguracionDataset ds = datasets[d];
+
+            cout << "\n=============================================================\n";
+            cout << "Sensibilidad de alpha en " << ds.nombre << " (AGG-BLX)\n";
+            cout << "=============================================================\n";
+            cout << left
+                 << setw(10) << "Alpha"
+                 << setw(15) << "2015-2024"
+                 << setw(15) << "2025 Fit."
+                 << setw(12) << "Tiempo(s)"
+                 << "\n";
+            cout << fixed << setprecision(3);
+
+            Portfolio portfolio_a(ds.fichero, ds.lo, ds.hi, cfg.lambda);
+
+            DatosPeriodo datos_2025_a = cargarPeriodoCSV(ds.fichero, "2025-01-01", "2025-12-31");
+            MetricasPeriodo metricas_2025_a = calcularMetricasPeriodo(datos_2025_a);
+
+            for (size_t a = 0; a < alphas.size(); a++) {
+                double alpha = alphas[a];
+
+                GeneticAlgorithm aggAlpha("AGG", "BLX");
+                aggAlpha.setAlphaBLX(alpha);
+
+                double suma_fit_train = 0.0;
+                double suma_fit_2025 = 0.0;
+                double suma_tiempo = 0.0;
+
+                for (int rep = 0; rep < cfg.num_ejecuciones; rep++) {
+                    Random::seed(semillas[rep]);
+
+                    auto inicio = high_resolution_clock::now();
+                    auto res = aggAlpha.optimize(portfolio_a, cfg.eval_ag);
+                    auto fin = high_resolution_clock::now();
+
+                    suma_tiempo += duration<double>(fin - inicio).count();
+                    suma_fit_train += res.fitness;
+
+                    auto eval = evaluarSolucionEnPeriodo(res.solution, metricas_2025_a, cfg.lambda);
+                    suma_fit_2025 += eval.first;
+                }
+
+                double media_train = suma_fit_train / cfg.num_ejecuciones;
+                double media_2025  = suma_fit_2025 / cfg.num_ejecuciones;
+                double media_tiempo = suma_tiempo / cfg.num_ejecuciones;
+
+                alpha_csv << ds.nombre << "," << alpha << ","
+                          << media_train << "," << media_2025 << ","
+                          << media_tiempo << "\n";
+
+                cout << left
+                     << setw(10) << alpha
+                     << setw(15) << media_train
+                     << setw(15) << media_2025
+                     << setw(12) << media_tiempo
+                     << "\n";
+            }
+        }
+
+        alpha_csv.close();
+
+        // Sensibilidad del tamaño de torneo usando AGG-BLX.
+        vector<int> valores_k = {2, 3, 5, 7};
+
+        ofstream torneo_csv("resultados/sensibilidad_torneo.csv");
+        if (!torneo_csv.is_open()) {
+            throw runtime_error("No se pudo crear sensibilidad_torneo.csv");
+        }
+        torneo_csv << "dataset,k,fitness_medio,fitness_2025_medio,tiempo_seg\n";
+        torneo_csv << fixed << setprecision(6);
+
+        for (size_t d = 0; d < datasets.size(); d++) {
+            ConfiguracionDataset ds = datasets[d];
+
+            cout << "\n=============================================================\n";
+            cout << "Sensibilidad de k en torneo para " << ds.nombre << " (AGG-BLX)\n";
+            cout << "=============================================================\n";
+            cout << left
+                 << setw(10) << "k"
+                 << setw(15) << "2015-2024"
+                 << setw(15) << "2025 Fit."
+                 << setw(12) << "Tiempo(s)"
+                 << "\n";
+            cout << fixed << setprecision(3);
+
+            Portfolio portfolio_k(ds.fichero, ds.lo, ds.hi, cfg.lambda);
+
+            DatosPeriodo datos_2025_k = cargarPeriodoCSV(ds.fichero, "2025-01-01", "2025-12-31");
+            MetricasPeriodo metricas_2025_k = calcularMetricasPeriodo(datos_2025_k);
+
+            for (size_t k = 0; k < valores_k.size(); k++) {
+                int valor_k = valores_k[k];
+
+                GeneticAlgorithm aggTorneo("AGG", "BLX");
+                aggTorneo.setKTorneo(valor_k);
+
+                double suma_fit_train = 0.0;
+                double suma_fit_2025 = 0.0;
+                double suma_tiempo = 0.0;
+
+                for (int rep = 0; rep < cfg.num_ejecuciones; rep++) {
+                    Random::seed(semillas[rep]);
+
+                    auto inicio = high_resolution_clock::now();
+                    auto res = aggTorneo.optimize(portfolio_k, cfg.eval_ag);
+                    auto fin = high_resolution_clock::now();
+
+                    suma_tiempo += duration<double>(fin - inicio).count();
+                    suma_fit_train += res.fitness;
+
+                    auto eval = evaluarSolucionEnPeriodo(res.solution, metricas_2025_k, cfg.lambda);
+                    suma_fit_2025 += eval.first;
+                }
+
+                double media_train = suma_fit_train / cfg.num_ejecuciones;
+                double media_2025  = suma_fit_2025 / cfg.num_ejecuciones;
+                double media_tiempo = suma_tiempo / cfg.num_ejecuciones;
+
+                torneo_csv << ds.nombre << "," << valor_k << ","
+                            << media_train << "," << media_2025 << ","
+                            << media_tiempo << "\n";
+
+                cout << left
+                     << setw(10) << valor_k
+                     << setw(15) << media_train
+                     << setw(15) << media_2025
+                     << setw(12) << media_tiempo
+                     << "\n";
+            }
+        }
+
+        torneo_csv.close();
 
         cout << "\nFicheros generados:\n";
         cout << "- resultados/resultados_medias.csv\n";
@@ -451,9 +861,13 @@ int main(int argc, char* argv[]) {
         cout << "- resultados/boxplot_ibex_35.csv\n";
         cout << "- resultados/boxplot_syp_100.csv\n";
         cout << "- resultados/boxplot_syp_500.csv\n";
+        cout << "- resultados/convergencia_ibex_35.csv\n";
+        cout << "- resultados/convergencia_syp_100.csv\n";
+        cout << "- resultados/convergencia_syp_500.csv\n";
+        cout << "- resultados/sensibilidad_alpha.csv\n";
+        cout << "- resultados/sensibilidad_torneo.csv\n";
         cout << "\nSi quieres cambiar parametros, ejecuta por ejemplo:\n";
         cout << "./main config.txt\n";
-
         return 0;
     }
     catch (const exception& e) {

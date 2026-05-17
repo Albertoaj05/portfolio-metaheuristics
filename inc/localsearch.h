@@ -31,19 +31,20 @@ public:
    * @param problem Problema a optimizar
    * @param maxevals Número máximo de evaluaciones
    * @return Mejor solución encontrada y su fitness
-   */
+  */
   virtual ResultMH<double> optimize(Problem<double> &problem, int maxevals) override;
 
 private:
+  ResultMH<double> optimizar(Problem<double>& problem, int maxevals);
+
   /**
    * Genera todos los pares (i, j) con i != j que forman el entorno
    */
-  std::vector<std::pair<int,int>> generarEntorno(int n);
+  std::vector<std::pair<int,int>> generarEntorno(size_t n);
 
   /**
    * Genera un vecino moviendo un porcentaje del peso de i hacia j
    * y comprueba si cumple los límites
    */
-  bool generarVecino(const tSolution<double>& actual, tSolution<double>& vecino,
-                     int i, int j, double ratio, double lo, double hi);
+  bool generarVecino(const tSolution<double>& actual, tSolution<double>& vecino, int i, int j, double ratio, double lo, double hi);
 };

@@ -3,4 +3,6 @@ num_ejecuciones=50
 eval_random=10000
 eval_bl=10000
 eval_greedy=1
+eval_ag=10000
+eval_am=10000
 semilla_inicial=42

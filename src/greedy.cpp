@@ -55,8 +55,6 @@ ResultMHDouble GreedySearch::optimize(ProblemDouble &problema, int num_evaluacio
         pos++;
     }
 
-    portfolio.fix(solucion);
-
     // Calculamos el fitness de la solución final
     double fitness = portfolio.fitness(solucion);
 

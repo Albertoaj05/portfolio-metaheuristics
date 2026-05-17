@@ -78,21 +78,17 @@ Portfolio::Portfolio(const string& filename, double lo, double hi, double lambda
     // Número total de días leídos
     T = mu.size();
 
-    // Solo para comprobar que todo está bien
-    cout << "n = " << n << endl;
-    cout << "T = " << T << endl;
-
     // Cálculo de la media por acción y de la parte interna de la fórmula del beneficio acumulado,
     // ya que falta por multiplicar por w(i)
     media_por_accion = vector<double>(n, 0.0);
     parte_interna_beneficio = vector<double>(n, 0.0);
 
-    for (int j = 0; j < n; j++) {
+    for (size_t j = 0; j < n; j++) {
 
         double suma_mu = 0.0;
         double suma_log = 0.0;
 
-        for (int i = 0; i < T; i++) {
+        for (size_t i = 0; i < T; i++) {
             suma_mu += mu[i][j];                // media normal
             suma_log += log(1.0 + mu[i][j]);    // acumulamos el término del beneficio logarítmico
         }
@@ -108,12 +104,12 @@ Portfolio::Portfolio(const string& filename, double lo, double hi, double lambda
     cov = vector<vector<double>>(n, vector<double>(n, 0.0));
 
     // Calculamos covarianza entre cada par de empresas
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = 0; j < n; j++) {
 
             double sum = 0.0;
 
-            for (int k = 0; k < T; k++) {
+            for (size_t k = 0; k < T; k++) {
                 // Fórmula de la covarianza
                 sum += (mu[k][i] - media_por_accion[i]) *  (mu[k][j] - media_por_accion[j]);
             }
@@ -200,10 +196,10 @@ void Portfolio::fix(tSolution<double>& solucion) {
         double dif = 1.0 - suma;
 
         // Buscamos los pesos que pueden crecer
-        vector<int> incrementables;
+        vector<size_t> incrementables;
         for (size_t i = 0; i < solucion.size(); i++) {
             if (solucion[i] > 0.0 && solucion[i] < hi) {
-                incrementables.push_back((int)i);
+                incrementables.push_back(i);
             }
         }
 
@@ -212,7 +208,7 @@ void Portfolio::fix(tSolution<double>& solucion) {
             double incremento = dif / incrementables.size();
 
             for (size_t k = 0; k < incrementables.size(); k++) {
-                int i = incrementables[k];
+                size_t i = incrementables[k];
 
                 // Si se puede subir el incremento entero se sube
                 if (solucion[i] + incremento <= hi) {
@@ -225,10 +221,10 @@ void Portfolio::fix(tSolution<double>& solucion) {
         }
         else {
             // Si no es suficiente, usar pesos iguales a 0 elegidos aleatoriamente
-            vector<int> ceros;
+            vector<size_t> ceros;
             for (size_t i = 0; i < solucion.size(); i++) {
                 if (solucion[i] == 0.0) {
-                    ceros.push_back((int)i);
+                    ceros.push_back(i);
                 }
             }
 
@@ -242,7 +238,7 @@ void Portfolio::fix(tSolution<double>& solucion) {
 
             bool cambiado = false;
             for (size_t k = 0; k < ceros.size(); k++) {
-                int i = ceros[k];
+                size_t i = ceros[k];
 
                 // Si la diferencia cabe en el rango, le asignamos dif
                 if (dif >= lo) {
@@ -277,10 +273,10 @@ void Portfolio::fix(tSolution<double>& solucion) {
         double exceso = suma - 1.0;
 
         // Buscamos pesos que sean reducibles
-        vector<int> reducibles;
+        vector<size_t> reducibles;
         for (size_t i = 0; i < solucion.size(); i++) {
             if (solucion[i] > lo) {
-                reducibles.push_back((int)i);
+                reducibles.push_back(i);
             }
         }
 
@@ -293,7 +289,7 @@ void Portfolio::fix(tSolution<double>& solucion) {
 
         // Se reduce el exceso, respetando siempre los rangos
         for (size_t k = 0; k < reducibles.size(); k++) {
-            int i = reducibles[k];
+            size_t i = reducibles[k];
 
             if (solucion[i] - decremento >= lo) {
                 solucion[i] -= decremento;
@@ -317,11 +313,11 @@ tSolution<double> Portfolio::createSolution() {
     tSolution<double> solucion(n, 0.0);
 
     // Número de ceros entre 1 y N-1
-    int n_ceros = Random::get(1, (int)n -1);
+    size_t n_ceros = Random::get(1, (int)n -1);
 
     // Creamos índices y los barajamos
-    vector<int> indices(n);
-    for(int i = 0; i < n; i++){
+    vector<size_t> indices(n);
+    for(size_t i = 0; i < n; i++){
         indices[i] = i;
     }
     shuffle(indices.begin(), indices.end(), Random::get_engine());
@@ -329,7 +325,7 @@ tSolution<double> Portfolio::createSolution() {
     // Los n_ceros primeros se quedan a 0, tal cual están
     // Al resto les asignamos valores aleatorios dentro de los rangos permitidos
     for(size_t i = n_ceros; i < n; i++){
-        int k = indices[i];
+        size_t k = indices[i];
         solucion[k] = Random::get<double>(lo, hi);
     }
 
@@ -364,10 +360,15 @@ tFitness Portfolio::fitness(const tSolution<double>& w) {
     }
 
     for (size_t i = 0; i < n; i++) {
-        for (size_t j = 0; j < n; j++) {
-            riesgo += w[i] * cov[i][j] * w[j];
+        if (w[i] == 0.0) continue; 
+        riesgo += w[i] * w[i] * cov[i][i];
+
+        for (size_t j = i + 1; j < n; j++) {
+            riesgo += 2.0 * w[i] * cov[i][j] * w[j];
         }
     }
+
+    riesgo = sqrt(riesgo);
 
     return beneficio_total - lambda * riesgo;
 }
@@ -425,8 +426,3 @@ double Portfolio::getHi() const {
 double Portfolio::getLo() const {
     return lo;
 }
-
-
-
-
-

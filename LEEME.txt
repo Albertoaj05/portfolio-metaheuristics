@@ -1,93 +1,150 @@
-PRÁCTICA 1 - METAHEURÍSTICAS
-Problema del Portfolio
+PRÁCTICA 2 - METAHEURÍSTICAS
+Técnicas de Búsqueda Basadas en Poblaciones para el Problema de Portfolio
 Curso 2025-2026
+Alumno: Alberto Aragón Jiménez
 
 Contenido de la carpeta software
 --------------------------------
 
 - common/
-  Contiene los ficheros base del framework proporcionado para la práctica.
+  Ficheros base del framework proporcionado: mh.h, problem.h, random.hpp, etc.
 
 - datos_portfolio_2526/
-  Incluye los tres conjuntos de datos usados en los experimentos:
+  Conjuntos de datos usados en los experimentos:
   ibex_35.csv, syp_100.csv y syp_500.csv.
 
 - inc/
-  Contiene las cabeceras de las clases y algoritmos implementados:
-  portfolio.h, greedy.h, localsearch.h y randomsearch.h.
+  Cabeceras de las clases implementadas:
+  portfolio.h    - Definición del problema Portfolio.
+  greedy.h       - Algoritmo Greedy.
+  localsearch.h  - Búsqueda Local (BL).
+  randomsearch.h - Algoritmo Aleatorio.
+  genetic.h      - Algoritmos Genéticos (AGG y AGE, con Arit, BLX y Uniforme).
+  memetic.h      - Algoritmos Meméticos (AM-All, AM-Rand, AM-Best, AM-Best1).
+  portfolio_convergencia.h - Variante para registrar curvas de convergencia.
 
 - src/
-  Contiene la implementación del problema y de los algoritmos:
-  portfolio.cpp, greedy.cpp y localsearch.cpp.
+  Implementaciones de los algoritmos:
+  portfolio.cpp   - Problema: fitness, reparación y generación de soluciones.
+  greedy.cpp      - Construcción voraz basada en heurística beneficio-riesgo.
+  localsearch.cpp - BL primero-mejor con ratio=0.4.
+  genetic.cpp     - AGG y AGE con operadores Arit, BLX y Uniforme.
+  memetic.cpp     - AMs basados en AGG-BLX con BL suave (ratio=0.15).
 
 - resultados/
-  Contiene los ficheros CSV generados con los resultados medios y los datos
-  usados para construir los boxplots.
+  Ficheros CSV generados por el programa principal y los scripts:
+  resultados_medias.csv      - Medias de fitness, beneficio, evaluaciones y tiempo.
+  semillas_utilizadas.csv    - Semillas empleadas en cada ejecución.
+  configuracion_usada.txt    - Parámetros con los que se ejecutó el programa.
+  boxplot_ibex_35.csv        - Datos de fitness por ejecución para boxplot.
+  boxplot_syp_100.csv
+  boxplot_syp_500.csv
+  convergencia_ibex_35.csv   - Curvas de convergencia por evaluación.
+  convergencia_syp_100.csv
+  convergencia_syp_500.csv
+  sensibilidad_alpha.csv     - Análisis de sensibilidad del parámetro alpha BLX.
+  sensibilidad_torneo.csv    - Análisis de sensibilidad del tamaño del torneo.
+  wilcoxon.csv               - Resultados del test estadístico de Wilcoxon.
 
 - graficas/
-  Contiene las imágenes PNG de los boxplots generados para cada dataset.
+  Imágenes PNG generadas por los scripts Python:
+  boxplots/                  - Boxplots principales por dataset.
+  convergencia/              - Curvas de convergencia por dataset.
+  tiempos/                   - Comparativas de tiempos por dataset.
+  sensibilidad_alpha/        - Efecto del parámetro alpha en BLX.
+  torneo_k/                  - Efecto del tamaño de torneo.
+  cruces/                    - Comparativa de cruces Arit, BLX y Uniforme.
+  am_extra/                  - Comparativa de variantes AM, incluyendo AM-Best1.
+  wilcoxon/                  - Test de Wilcoxon entre pares de algoritmos.
 
 - main.cpp
-  Programa principal que ejecuta los experimentos de la práctica.
+  Programa principal. Ejecuta todos los algoritmos (Greedy, Random, BL,
+  AGG-Arit, AGG-BLX, AGG-Unif, AGE-Arit, AGE-BLX, AGE-Unif, AM-All,
+  AM-Rand, AM-Best, AM-Best1) sobre los tres datasets, genera los CSVs
+  de resultados y realiza los experimentos extra: convergencia,
+  sensibilidad de alpha y sensibilidad de k en torneo.
 
-- boxplots.py
-  Script en Python para generar los boxplots a partir de los ficheros CSV
-  guardados en la carpeta resultados.
+- scripts/boxplots.py
+  Genera los boxplots por dataset.
+
+- scripts/convergencia.py
+  Genera las curvas de convergencia.
+
+- scripts/sensibilidad_alpha.py
+  Genera la gráfica de sensibilidad del parámetro alpha del cruce BLX.
+
+- scripts/torneo_k.py
+  Genera la gráfica de sensibilidad del tamaño de torneo.
+
+- scripts/tiempos.py
+  Genera las gráficas comparativas de tiempos de ejecución.
+
+- scripts/boxplots_cruces.py
+  Genera los boxplots comparando los operadores de cruce.
+
+- scripts/boxplots_am_extra.py
+  Genera los boxplots de las variantes meméticas y AM-Best1.
+
+- scripts/wilcoxon.py
+  Ejecuta el test estadístico de Wilcoxon y genera la tabla/gráfica.
+
+- generar_graficas.sh
+  Script bash que lanza todos los scripts Python anteriores en orden.
+  Equivale a ejecutarlos uno a uno.
 
 - config.txt
-  Fichero de configuración opcional. Si no se proporciona, el programa usa
-  por defecto los valores pedidos en el guion de la práctica:
-  lambda=500, 50 ejecuciones, 10000 evaluaciones para Random y BL,
-  1 evaluación para Greedy y semilla inicial 42.
+  Fichero de configuración opcional. Permite cambiar sin recompilar:
+  lambda, num_ejecuciones, eval_random, eval_bl, eval_greedy, eval_ag,
+  eval_am y semilla_inicial.
+  Valores por defecto: lambda=500, num_ejecuciones=50, eval_*=10000,
+  eval_greedy=1, semilla_inicial=42.
 
 - CMakeLists.txt
   Fichero de configuración para compilar el proyecto con CMake.
 
+
 Compilación
 -----------
 
-Desde la carpeta software:
+Opción 1 - Compilación directa (recomendada):
 
-mkdir build
-cd build
-cmake ..
-make
+  g++ -std=c++17 -O3 main.cpp src/*.cpp -Iinc -Icommon -o main
+
+Opción 2 - Con CMake:
+
+  mkdir build && cd build && cmake .. && make
+
 
 Ejecución
 ---------
 
-Si el programa se ha compilado con CMake (usando build), el ejecutable se
-encuentra en la carpeta build. En este caso, debe ejecutarse desde la carpeta
-software para que las rutas funcionen correctamente:
+Ejecutar siempre desde la carpeta software, ya que las rutas son relativas:
 
-./build/main
+  ./main                 # parámetros por defecto
+  ./main config.txt      # con fichero de configuración
 
-(opcionalmente con configuración)
-./build/main config.txt
+Con CMake, ejecutando también desde la carpeta software:
 
-Si se compila directamente sin CMake:
+  ./build/main
+  ./build/main config.txt
 
-g++ -std=c++17 -O3 main.cpp src/*.cpp -Icommon -Iinc -o main
-
-el ejecutable se genera en la carpeta software, y se ejecuta directamente con:
-
-./main
-./main config.txt
-
-Tras ejecutar el programa se generan en la carpeta resultados:
-- resultados_medias.csv
-- semillas_utilizadas.csv
-- configuracion_usada.txt
-- boxplot_ibex_35.csv
-- boxplot_syp_100.csv
-- boxplot_syp_500.csv
 
 Generación de gráficas
 ----------------------
 
-Una vez generados los CSV de resultados, los boxplots se obtienen ejecutando:
+Tras ejecutar el programa principal, generar todas las gráficas con:
 
-python3 boxplots.py
+  bash generar_graficas.sh
 
-Las imágenes se guardan en la carpeta graficas.
+O ejecutar cada script por separado:
 
+  python3 scripts/boxplots.py             # boxplots por dataset
+  python3 scripts/convergencia.py         # curvas de convergencia
+  python3 scripts/sensibilidad_alpha.py   # sensibilidad del parametro alpha
+  python3 scripts/torneo_k.py             # sensibilidad del tamaño de torneo
+  python3 scripts/tiempos.py              # comparativa de tiempos
+  python3 scripts/boxplots_cruces.py      # comparativa de cruces
+  python3 scripts/boxplots_am_extra.py    # variantes memeticas extra
+  python3 scripts/wilcoxon.py             # test estadistico de Wilcoxon
+
+Las imágenes se guardan en graficas/.

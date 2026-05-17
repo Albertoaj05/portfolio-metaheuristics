@@ -1,6 +1,5 @@
 #pragma once
 #include <mh.h>
-
 using namespace std;
 
 /**
@@ -12,20 +11,8 @@ using namespace std;
  */
 template <typename tDomain> class RandomSearch : public MH<tDomain> {
 
-public:
-  RandomSearch() : MH<tDomain>() {}
-  virtual ~RandomSearch() {}
-  // Implement the MH interface methods
-  /**
-   * Create random solutions until maxevals has been achieved, and returns the
-   * best one.
-   *
-   * @param problem The problem to be optimized
-   * @param maxevals Maximum number of evaluations allowed
-   * @return A pair containing the best solution found and its fitness
-   */
-  ResultMH<tDomain> optimize(Problem<tDomain> &problem, int num_evaluaciones) override {
-
+private:
+  ResultMH<tDomain> optimizar(Problem<tDomain>& problem, int num_evaluaciones) {
     // Comprobamos que el número de evaluciones es válido
     assert(num_evaluaciones > 0);
     tSolution<tDomain> mejorSolucion;
@@ -43,8 +30,25 @@ public:
         mejorSolucion = solucion;
         mejor_fitness = fitness;
       }
+
     }
 
     return ResultMH<tDomain>(mejorSolucion, mejor_fitness, num_evaluaciones);
+  }
+
+public:
+  RandomSearch() : MH<tDomain>() {}
+  virtual ~RandomSearch() {}
+  // Implement the MH interface methods
+  /**
+   * Create random solutions until maxevals has been achieved, and returns the
+   * best one.
+   *
+   * @param problem The problem to be optimized
+   * @param maxevals Maximum number of evaluations allowed
+   * @return A pair containing the best solution found and its fitness
+   */
+  ResultMH<tDomain> optimize(Problem<tDomain> &problem, int num_evaluaciones) override {
+    return optimizar(problem, num_evaluaciones);
   }
 };
