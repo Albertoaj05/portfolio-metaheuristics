@@ -34,6 +34,8 @@ public:
   */
   virtual ResultMH<double> optimize(Problem<double> &problem, int maxevals) override;
 
+    // BL desde una solución dada: necesaria para BMB, ILS e ILS-ES
+    ResultMH<double> optimizeFromSolution( Problem<double>& problem, const tSolution<double>& inicial, int maxevals);
 private:
   ResultMH<double> optimizar(Problem<double>& problem, int maxevals);
 

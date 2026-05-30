@@ -238,7 +238,7 @@ void MemeticAlgorithm::busquedaLocalSuave(tSolution<double>& sol, double& fitnes
     while (evals_bl < 100 && evaluaciones < evaluaciones_max) {
         
         // Barajamos los pares aleatoriamente
-        shuffle(pares.begin(), pares.end(), Random::get_engine());
+        Random::shuffle(pares.begin(), pares.end());
 
         bool mejora = false;
 

@@ -21,29 +21,22 @@ ORDEN_ALGORITMOS = [
     "Greedy",
     "Random",
     "BL",
-    "AGG-Arit",
-    "AGG-BLX",
-    "AGE-Arit",
-    "AGE-BLX",
-    "AM-All",
-    "AM-Rand",
     "AM-Best",
+    "BMB",
+    "ILS-BL",
+    "ES",
+    "ILS-ES",
 ]
 
 COLORES = {
-    "Greedy": "#B0B0B0",
-    "Random": "#9E9E9E",
+    "Greedy": "#111111",
+    "Random": "#7f7f7f",
     "BL": "#4C72B0",
-    "AGG-Arit": "#55A868",
-    "AGG-BLX": "#2E8B57",
-    "AGG-Unif": "#1E5631",
-    "AGE-Arit": "#C44E52",
-    "AGE-BLX": "#8B0000",
-    "AGE-Unif": "#5C0000",
-    "AM-All": "#8172B3",
-    "AM-Rand": "#9370DB",
     "AM-Best": "#6A5ACD",
-    "AM-Best1": "#483D8B",
+    "BMB": "#55A868",
+    "ILS-BL": "#2E8B57",
+    "ES": "#C44E52",
+    "ILS-ES": "#8B0000",
 }
 
 
@@ -85,6 +78,7 @@ def anadir_etiquetas(barras, valores):
 
 
 def guardar_grafica(nombre_dataset, datos_dataset, sufijo):
+    # Una grafica por dataset para evitar que las escalas se mezclen.
     # Mantiene el mismo orden de algoritmos en todos los datasets.
     valores = [datos_dataset.get(algoritmo, 0.0) for algoritmo in ORDEN_ALGORITMOS]
     colores = [COLORES[algoritmo] for algoritmo in ORDEN_ALGORITMOS]
@@ -108,7 +102,6 @@ def guardar_grafica(nombre_dataset, datos_dataset, sufijo):
     plt.savefig(ruta_salida, dpi=140)
     plt.close()
 
-    print(f"Generado: {ruta_salida}")
 
 
 def main():

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Dibuja las curvas de convergencia guardadas por el programa principal.
+# Dibuja las curvas de mejor fitness acumulado durante la ejecucion.
 
 import csv
 import os
@@ -18,15 +18,21 @@ DATASETS = [
 ORDEN_ALGORITMOS = [
     "Random",
     "BL",
-    "AGG-BLX",
     "AM-Best",
+    "BMB",
+    "ILS-BL",
+    "ES",
+    "ILS-ES",
 ]
 
 COLORES = {
-    "Random": "#888888",
+    "Random": "#7f7f7f",
     "BL": "#1f77b4",
-    "AGG-BLX": "#2ca02c",
-    "AM-Best": "#d62728",
+    "AM-Best": "#9467bd",
+    "BMB": "#2ca02c",
+    "ILS-BL": "#ff7f0e",
+    "ES": "#d62728",
+    "ILS-ES": "#17becf",
 }
 
 
@@ -73,6 +79,7 @@ def dibujar_algoritmo(algoritmo, datos):
 
 
 def guardar_grafica(sufijo, nombre_dataset):
+    # Crea una grafica de convergencia para el dataset indicado.
     ruta_csv = f"resultados/convergencia_{sufijo}.csv"
 
     if not os.path.exists(ruta_csv):
@@ -100,7 +107,6 @@ def guardar_grafica(sufijo, nombre_dataset):
     plt.savefig(ruta_salida, dpi=140)
     plt.close()
 
-    print(f"Generado: {ruta_salida}")
 
 
 def main():

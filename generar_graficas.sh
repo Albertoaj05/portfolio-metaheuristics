@@ -1,13 +1,15 @@
 #!/bin/bash
+set -e
+
 echo "Generando gráficas y tablas..."
 python3 scripts/boxplots.py
+python3 scripts/boxplot_grasp.py
+python3 scripts/boxplot_ils.py
 python3 scripts/convergencia.py
-python3 scripts/sensibilidad_alpha.py
+python3 scripts/sensibilidad_es_phi.py
+python3 scripts/sensibilidad_es_mu.py
 python3 scripts/wilcoxon.py
-python3 scripts/torneo_k.py
 python3 scripts/tiempos.py
-python3 scripts/boxplots_cruces.py
-python3 scripts/boxplots_am_extra.py
 echo "Listo."
 echo "Gráficas: graficas/"
 echo "Tablas: resultados/"

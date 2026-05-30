@@ -234,7 +234,8 @@ void Portfolio::fix(tSolution<double>& solucion) {
             }
 
             // Mezclamos aleatoriamente para que no se elija siempre el mismo
-            shuffle(ceros.begin(), ceros.end(), Random::get_engine());
+            Random::shuffle(ceros.begin(), ceros.end());
+
 
             bool cambiado = false;
             for (size_t k = 0; k < ceros.size(); k++) {
@@ -320,7 +321,7 @@ tSolution<double> Portfolio::createSolution() {
     for(size_t i = 0; i < n; i++){
         indices[i] = i;
     }
-    shuffle(indices.begin(), indices.end(), Random::get_engine());
+    Random::shuffle(indices.begin(), indices.end());
 
     // Los n_ceros primeros se quedan a 0, tal cual están
     // Al resto les asignamos valores aleatorios dentro de los rangos permitidos

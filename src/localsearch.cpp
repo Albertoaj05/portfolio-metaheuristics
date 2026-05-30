@@ -54,64 +54,58 @@ bool LocalSearch::generarVecino(const tSolution<double>& actual, tSolution<doubl
     return true;
 }
 
-// Función que aplica una búsqueda local primero mejor, explorando vecinos generados al mover un 40% del peso entre dos posiciones
-ResultMHDouble LocalSearch::optimizar(ProblemDouble &problem, int n_evaluaciones) {
+// BL desde una solución inicial dada.
+ResultMHDouble LocalSearch::optimizeFromSolution(ProblemDouble& problem, const tSolution<double>& inicial, int maxevals) {
+    assert(maxevals > 0);
 
-    // Comprobamos que el número de evaluaciones sea válido
-    assert(n_evaluaciones > 0);
-
-    // Convertimos el problema general al problema Portfolio
     Portfolio& portfolio = dynamic_cast<Portfolio&>(problem);
 
     double lo = portfolio.getLo();
     double hi = portfolio.getHi();
-    double ratio = 0.4; // porcentaje que se mueve de una posición a otra
+    double ratio = 0.4;
+
     size_t n = problem.getSolutionSize();
 
-    // Generamos una solución inicial aleatoria
-    tSolution<double> actual = problem.createSolution();
+    // Partimos de la solución recibida.
+    // No hacemos fix porque createSolution ya repara, y la mutación de ILS solo reordena pesos.
+    tSolution<double> actual = inicial;
+
     double fitness_actual = problem.fitness(actual);
     int evaluaciones = 1;
 
-    // Generamos todos los pares (i,j) con i != j que forman el entorno de la solución
     vector<pair<int,int>> pares = generarEntorno(n);
 
-    // Repetimos mientras queden evaluaciones disponibles
-    while (evaluaciones < n_evaluaciones) {
-        
-        // Barajamos los pares aleatoriamente
-        shuffle(pares.begin(), pares.end(), Random::get_engine());
-    
+    while (evaluaciones < maxevals) {
+
+        // Exploración aleatoria del entorno, como en la BL de la P1.
+        Random::shuffle(pares.begin(), pares.end());
+
         bool mejora = false;
 
-        // Recorremos los vecinos en orden aleatorio
-        for (size_t k = 0; k < pares.size() && evaluaciones < n_evaluaciones; k++) {
+        for (size_t k = 0; k < pares.size() && evaluaciones < maxevals; k++) {
 
             int i = pares[k].first;
             int j = pares[k].second;
 
-            // Generamos el vecino
             tSolution<double> vecino;
-            bool valido = generarVecino(actual, vecino, i, j, ratio, lo, hi);
 
-            // Si el vecino no es válido, pasamos al siguiente
-            if (!valido) continue;
+            if (!generarVecino(actual, vecino, i, j, ratio, lo, hi)) {
+                continue;
+            }
 
-            // Evaluamos el vecino
             double fitness_vecino = problem.fitness(vecino);
             evaluaciones++;
 
-            // si mejora, lo aceptamos y dejamos de recorrer el vecindario
+            // Primero mejor: aceptamos el primer vecino que mejore.
             if (fitness_vecino > fitness_actual) {
                 actual = vecino;
                 fitness_actual = fitness_vecino;
                 mejora = true;
+                break;
             }
-
-            if (mejora) break;
         }
 
-        // Si no se ha encontrado ninguna mejora, se termina la búsqueda
+        // Si se recorre todo el entorno sin mejorar, estamos en óptimo local.
         if (!mejora) {
             break;
         }
@@ -120,7 +114,12 @@ ResultMHDouble LocalSearch::optimizar(ProblemDouble &problem, int n_evaluaciones
     return ResultMHDouble(actual, fitness_actual, evaluaciones);
 }
 
-// Método que llama a ejecutar la búsqueda local
-ResultMHDouble LocalSearch::optimize(ProblemDouble &problem, int n_evaluaciones) {
-    return optimizar(problem, n_evaluaciones);
+// BL normal: genera solución aleatoria y reutiliza optimizeFromSolution.
+ResultMHDouble LocalSearch::optimize(ProblemDouble& problem, int maxevals) {
+
+    assert(maxevals > 0);
+
+    tSolution<double> inicial = problem.createSolution();
+
+    return optimizeFromSolution(problem, inicial, maxevals);
 }

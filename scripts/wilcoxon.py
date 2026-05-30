@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Calcula tests de Wilcoxon pareados y genera un resumen en CSV y grafica.
+# Calcula el Wilcoxon pareado y genera la tabla resumen.
 
 import csv
 import os
@@ -11,20 +11,14 @@ from scipy.stats import wilcoxon
 
 
 PARES_COMPARACION = [
-    ("AGG-BLX", "AGG-Arit"),
-    ("AGE-BLX", "AGE-Arit"),
-    ("AGG-BLX", "AGG-Unif"),
-    ("AGG-Unif", "AGG-Arit"),
-    ("AM-Best", "AGG-BLX"),
-    ("AM-Best", "AM-Rand"),
-    ("AM-Best", "AM-All"),
-    ("AM-Rand", "AM-All"),
-    ("AM-Best", "AM-Best1"),
-    ("BL", "Random"),
-    ("AGG-BLX", "BL"),
+    ("ILS-BL", "BMB"),
+    ("BMB", "ES"),
+    ("ILS-BL", "ES"),
+    ("ILS-ES", "BMB"),
+    ("ILS-ES", "ILS-BL"),
+    ("ILS-ES", "ES"),
 ]
 
-# Datasets usados para leer los resultados de las 50 ejecuciones.
 DATASETS = [
     ("ibex_35", "Ibex 35"),
     ("syp_100", "S&P 100"),
@@ -36,7 +30,6 @@ RUTA_GRAFICA_SALIDA = "graficas/wilcoxon/wilcoxon.png"
 
 
 def leer_boxplot(ruta_csv):
-    # Lee los fitness individuales de cada algoritmo.
     datos = {}
 
     with open(ruta_csv) as fichero:
@@ -45,11 +38,7 @@ def leer_boxplot(ruta_csv):
         for fila in lector:
             algoritmo = fila["algoritmo"]
             fitness = float(fila["fitness_2015_2024"])
-
-            if algoritmo not in datos:
-                datos[algoritmo] = []
-
-            datos[algoritmo].append(fitness)
+            datos.setdefault(algoritmo, []).append(fitness)
 
     return datos
 
@@ -59,60 +48,32 @@ def media(valores):
 
 
 def significancia(p_valor):
-    # Convierte el p-valor en una marca de significancia.
     if p_valor < 0.001:
         return "***"
-
     if p_valor < 0.01:
         return "**"
-
     if p_valor < 0.05:
         return "*"
-
     return "n.s."
 
 
 def color_significancia(p_valor):
     if p_valor < 0.001:
         return "#a8e6a3"
-
     if p_valor < 0.01:
         return "#cdedca"
-
     if p_valor < 0.05:
         return "#e6f4e3"
-
     return "#f4d4d4"
 
 
-def calcular_wilcoxon(valores_a, valores_b):
-    # Contraste unilateral: comprueba si A supera a B.
-    try:
-        _, p_valor = wilcoxon(valores_a, valores_b, alternative="greater")
-    except ValueError:
-        return None
-
-    return p_valor
-
-
 def calcular_resultados():
-    # Calcula todos los pares y prepara datos para CSV y tabla.
+    # Compara las 50 ejecuciones emparejadas usando las mismas semillas.
     resultados_por_par = {}
-    filas_csv = [
-        [
-            "dataset",
-            "algoritmo_A",
-            "algoritmo_B",
-            "media_A",
-            "media_B",
-            "p_valor",
-            "significancia",
-        ]
-    ]
+    filas_csv = [["dataset", "algoritmo_A", "algoritmo_B", "media_A", "media_B", "p_valor", "significancia"]]
 
     for sufijo, nombre_dataset in DATASETS:
         ruta_csv = f"resultados/boxplot_{sufijo}.csv"
-
         if not os.path.exists(ruta_csv):
             continue
 
@@ -124,55 +85,54 @@ def calcular_resultados():
 
             valores_a = datos[algoritmo_a]
             valores_b = datos[algoritmo_b]
-
             if len(valores_a) != len(valores_b):
                 continue
 
-            p_valor = calcular_wilcoxon(valores_a, valores_b)
-
-            if p_valor is None:
+            try:
+                _, p_valor = wilcoxon(valores_a, valores_b, alternative="greater")
+            except ValueError:
                 continue
 
-            filas_csv.append(
-                [
-                    nombre_dataset,
-                    algoritmo_a,
-                    algoritmo_b,
-                    f"{media(valores_a):.6f}",
-                    f"{media(valores_b):.6f}",
-                    f"{p_valor:.6f}",
-                    significancia(p_valor),
-                ]
-            )
+            resultados_por_par.setdefault((algoritmo_a, algoritmo_b), {})[nombre_dataset] = p_valor
+            filas_csv.append([
+                nombre_dataset,
+                algoritmo_a,
+                algoritmo_b,
+                f"{media(valores_a):.6f}",
+                f"{media(valores_b):.6f}",
+                f"{p_valor:.6g}",
+                significancia(p_valor),
+            ])
 
-            par = (algoritmo_a, algoritmo_b)
-
-            if par not in resultados_por_par:
-                resultados_por_par[par] = {}
-
-            resultados_por_par[par][nombre_dataset] = p_valor
-
-    return filas_csv, resultados_por_par
+    return resultados_por_par, filas_csv
 
 
-def guardar_csv(filas_csv):
-    # Guarda la tabla numerica con medias, p-valor y significancia.
+def guardar_csv(filas):
+    os.makedirs(os.path.dirname(RUTA_CSV_SALIDA), exist_ok=True)
     with open(RUTA_CSV_SALIDA, "w", newline="") as fichero:
-        escritor = csv.writer(fichero)
-        escritor.writerows(filas_csv)
+        writer = csv.writer(fichero)
+        writer.writerows(filas)
 
 
-def construir_tabla(resultados_por_par):
-    # Prepara textos y colores para la tabla dibujada con matplotlib.
+def guardar_grafica(resultados_por_par):
+    # Pinta una tabla de p-valores con colores segun la significancia.
+    if not resultados_por_par:
+        print("AVISO: no hay datos para Wilcoxon")
+        return
+
+    pares = list(resultados_por_par.keys())
+    datasets = [nombre for _, nombre in DATASETS]
+
+    columnas = ["Comparacion"] + datasets
     texto_tabla = []
     colores_tabla = []
 
-    for algoritmo_a, algoritmo_b in PARES_COMPARACION:
+    for algoritmo_a, algoritmo_b in pares:
         fila_texto = [f"{algoritmo_a} vs {algoritmo_b}"]
-        fila_colores = ["#ffffff"]
+        fila_colores = ["#f7f7f7"]
 
-        for _, nombre_dataset in DATASETS:
-            p_valor = resultados_por_par.get((algoritmo_a, algoritmo_b), {}).get(nombre_dataset)
+        for dataset in datasets:
+            p_valor = resultados_por_par[(algoritmo_a, algoritmo_b)].get(dataset)
 
             if p_valor is None:
                 fila_texto.append("-")
@@ -184,38 +144,32 @@ def construir_tabla(resultados_por_par):
         texto_tabla.append(fila_texto)
         colores_tabla.append(fila_colores)
 
-    return texto_tabla, colores_tabla
-
-
-def guardar_grafica(resultados_por_par):
-    columnas = ["Comparacion"] + [nombre for _, nombre in DATASETS]
-    texto_tabla, colores_tabla = construir_tabla(resultados_por_par)
-
-    os.makedirs(os.path.dirname(RUTA_GRAFICA_SALIDA), exist_ok=True)
-
-    figura, ax = plt.subplots(figsize=(11, 5.6))
+    fig, ax = plt.subplots(figsize=(12.5, 0.48 * len(pares) + 2.0))
     ax.axis("off")
 
-    # Dibuja la tabla con colores segun la significancia.
     tabla = ax.table(
         cellText=texto_tabla,
         colLabels=columnas,
         cellColours=colores_tabla,
-        cellLoc="center",
-        loc="center",
+        colColours=["#cfd8dc"] * len(columnas),
         colWidths=[0.35, 0.22, 0.22, 0.22],
+        cellLoc="center",
+        loc="upper center",
+        bbox=[0.02, 0.24, 0.96, 0.72],
     )
 
     tabla.auto_set_font_size(False)
     tabla.set_fontsize(10)
-    tabla.scale(1, 1.5)
+    tabla.scale(1, 1.25)
 
-    for columna in range(len(columnas)):
-        tabla[0, columna].set_facecolor("#cfd8dc")
-        tabla[0, columna].set_text_props(weight="bold")
+    for (fila, columna), celda in tabla.get_celld().items():
+        celda.set_edgecolor("black")
+        celda.set_linewidth(0.9)
 
-    for fila in range(len(texto_tabla)):
-        tabla[fila + 1, 0].set_text_props(weight="bold")
+        if fila == 0:
+            celda.set_text_props(weight="bold")
+        elif columna == 0:
+            celda.set_text_props(weight="bold")
 
     leyenda = [
         Patch(facecolor="#a8e6a3", edgecolor="black", label="Verde fuerte: muy significativo (p < 0.001)"),
@@ -223,27 +177,18 @@ def guardar_grafica(resultados_por_par):
         Patch(facecolor="#e6f4e3", edgecolor="black", label="Verde claro: significativo (p < 0.05)"),
         Patch(facecolor="#f4d4d4", edgecolor="black", label="Rojo: no significativo"),
     ]
+    ax.legend(handles=leyenda, loc="lower center", bbox_to_anchor=(0.5, 0.02), ncol=2, frameon=False)
 
-    figura.legend(
-        handles=leyenda,
-        loc="lower center",
-        ncol=2,
-        frameon=False,
-        fontsize=9,
-        bbox_to_anchor=(0.5, 0.02),
-    )
-
-    plt.tight_layout(rect=[0, 0.07, 1, 1])
-    plt.savefig(RUTA_GRAFICA_SALIDA, dpi=140, bbox_inches="tight")
-    plt.close(figura)
-
-    print(f"Generado: {RUTA_GRAFICA_SALIDA}")
+    os.makedirs(os.path.dirname(RUTA_GRAFICA_SALIDA), exist_ok=True)
+    plt.subplots_adjust(top=0.98, bottom=0.08, left=0.02, right=0.98)
+    plt.savefig(RUTA_GRAFICA_SALIDA, dpi=220)
+    plt.close()
 
 
 def main():
-    filas_csv, resultados_por_par = calcular_resultados()
-    guardar_csv(filas_csv)
-    guardar_grafica(resultados_por_par)
+    resultados, filas = calcular_resultados()
+    guardar_csv(filas)
+    guardar_grafica(resultados)
 
 
 if __name__ == "__main__":

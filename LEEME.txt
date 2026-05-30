@@ -1,5 +1,5 @@
-PRÁCTICA 2 - METAHEURÍSTICAS
-Técnicas de Búsqueda Basadas en Poblaciones para el Problema de Portfolio
+PRÁCTICA 3 - METAHEURÍSTICAS
+Técnicas de Búsqueda Basadas en Trayectorias para el Problema de Portfolio
 Curso 2025-2026
 Alumno: Alberto Aragón Jiménez
 
@@ -15,89 +15,78 @@ Contenido de la carpeta software
 
 - inc/
   Cabeceras de las clases implementadas:
-  portfolio.h    - Definición del problema Portfolio.
-  greedy.h       - Algoritmo Greedy.
-  localsearch.h  - Búsqueda Local (BL).
-  randomsearch.h - Algoritmo Aleatorio.
-  genetic.h      - Algoritmos Genéticos (AGG y AGE, con Arit, BLX y Uniforme).
-  memetic.h      - Algoritmos Meméticos (AM-All, AM-Rand, AM-Best, AM-Best1).
+  portfolio.h              - Definición del problema Portfolio.
+  greedy.h                 - Algoritmo Greedy.
+  randomsearch.h           - Algoritmo Aleatorio.
+  localsearch.h            - Búsqueda Local (BL).
+  memetic.h                - AM-Best, usado como mejor algoritmo de la P2.
+  bmb.h                    - Búsqueda Multiarranque Básica.
+  simulatedannealing.h     - Enfriamiento Simulado.
+  ils.h                    - ILS con BL.
+  ilses.h                  - ILS hibridado con ES.
+  grasp.h                  - GRASP extra.
   portfolio_convergencia.h - Variante para registrar curvas de convergencia.
 
 - src/
   Implementaciones de los algoritmos:
-  portfolio.cpp   - Problema: fitness, reparación y generación de soluciones.
-  greedy.cpp      - Construcción voraz basada en heurística beneficio-riesgo.
-  localsearch.cpp - BL primero-mejor con ratio=0.4.
-  genetic.cpp     - AGG y AGE con operadores Arit, BLX y Uniforme.
-  memetic.cpp     - AMs basados en AGG-BLX con BL suave (ratio=0.15).
+  portfolio.cpp            - Fitness, reparación y generación de soluciones.
+  greedy.cpp               - Construcción voraz.
+  localsearch.cpp          - BL primero-mejor con ratio=0.4.
+  memetic.cpp              - Algoritmo memético usado como referencia de P2.
+  bmb.cpp                  - BMB con varios arranques independientes.
+  simulatedannealing.cpp   - Enfriamiento Simulado con Cauchy modificado.
+  ils.cpp                  - ILS-BL.
+  ilses.cpp                - ILS-ES.
+  grasp.cpp                - GRASP extra: construcción semi-voraz + BL.
 
 - resultados/
   Ficheros CSV generados por el programa principal y los scripts:
-  resultados_medias.csv      - Medias de fitness, beneficio, evaluaciones y tiempo.
-  semillas_utilizadas.csv    - Semillas empleadas en cada ejecución.
-  configuracion_usada.txt    - Parámetros con los que se ejecutó el programa.
-  boxplot_ibex_35.csv        - Datos de fitness por ejecución para boxplot.
+  resultados_medias.csv       - Medias de fitness, beneficio, evaluaciones y tiempo.
+  semillas_utilizadas.csv     - Semillas empleadas en cada ejecución.
+  configuracion_usada.txt     - Parámetros con los que se ejecutó el programa.
+  boxplot_ibex_35.csv         - Datos de fitness por ejecución para boxplot.
   boxplot_syp_100.csv
   boxplot_syp_500.csv
-  convergencia_ibex_35.csv   - Curvas de convergencia por evaluación.
+  convergencia_ibex_35.csv    - Curvas de convergencia.
   convergencia_syp_100.csv
   convergencia_syp_500.csv
-  sensibilidad_alpha.csv     - Análisis de sensibilidad del parámetro alpha BLX.
-  sensibilidad_torneo.csv    - Análisis de sensibilidad del tamaño del torneo.
-  wilcoxon.csv               - Resultados del test estadístico de Wilcoxon.
+  sensibilidad_es_phi.csv     - Sensibilidad de ES respecto a phi.
+  sensibilidad_es_mu.csv      - Sensibilidad de ES respecto a mu.
+  wilcoxon.csv                - Resultados del test de Wilcoxon.
 
 - graficas/
   Imágenes PNG generadas por los scripts Python:
-  boxplots/                  - Boxplots principales por dataset.
-  convergencia/              - Curvas de convergencia por dataset.
-  tiempos/                   - Comparativas de tiempos por dataset.
-  sensibilidad_alpha/        - Efecto del parámetro alpha en BLX.
-  torneo_k/                  - Efecto del tamaño de torneo.
-  cruces/                    - Comparativa de cruces Arit, BLX y Uniforme.
-  am_extra/                  - Comparativa de variantes AM, incluyendo AM-Best1.
-  wilcoxon/                  - Test de Wilcoxon entre pares de algoritmos.
+  boxplots/                   - Boxplots principales de P3.
+  convergencia/               - Curvas de convergencia.
+  tiempos/                    - Comparativas de tiempos.
+  sensibilidad_es/            - Sensibilidad de ES para phi y mu.
+  comparacionGrasp/           - Comparación específica de GRASP frente a métodos similares.
+  comparacionILS/             - Comparación de variantes extra de ILS e ILS-ES.
+  wilcoxon/                   - Test de Wilcoxon.
 
 - main.cpp
-  Programa principal. Ejecuta todos los algoritmos (Greedy, Random, BL,
-  AGG-Arit, AGG-BLX, AGG-Unif, AGE-Arit, AGE-BLX, AGE-Unif, AM-All,
-  AM-Rand, AM-Best, AM-Best1) sobre los tres datasets, genera los CSVs
-  de resultados y realiza los experimentos extra: convergencia,
-  sensibilidad de alpha y sensibilidad de k en torneo.
+  Programa principal. Ejecuta Greedy, Random, BL, AM-Best, BMB, BMB-10,
+  GRASP, ES, ILS-BL, ILS-10, ILS-30, ILS-ES, ILS-ES-10 e ILS-ES-30
+  sobre los tres datasets. También genera los
+  CSV de sensibilidad de ES y convergencia.
 
-- scripts/boxplots.py
-  Genera los boxplots por dataset.
-
-- scripts/convergencia.py
-  Genera las curvas de convergencia.
-
-- scripts/sensibilidad_alpha.py
-  Genera la gráfica de sensibilidad del parámetro alpha del cruce BLX.
-
-- scripts/torneo_k.py
-  Genera la gráfica de sensibilidad del tamaño de torneo.
-
-- scripts/tiempos.py
-  Genera las gráficas comparativas de tiempos de ejecución.
-
-- scripts/boxplots_cruces.py
-  Genera los boxplots comparando los operadores de cruce.
-
-- scripts/boxplots_am_extra.py
-  Genera los boxplots de las variantes meméticas y AM-Best1.
-
-- scripts/wilcoxon.py
-  Ejecuta el test estadístico de Wilcoxon y genera la tabla/gráfica.
+- scripts/
+  boxplots.py        - Boxplots principales de P3.
+  convergencia.py    - Curvas de convergencia.
+  boxplot_grasp.py          - Comparación específica de GRASP con BL, BMB e ILS-BL.
+  boxplot_ils.py            - Comparación de ILS-10, ILS-BL, ILS-30, ILS-ES-10, ILS-ES e ILS-ES-30.
+  sensibilidad_es_phi.py    - Sensibilidad de ES respecto a phi.
+  sensibilidad_es_mu.py     - Sensibilidad de ES respecto a mu.
+  tiempos.py               - Comparativa de tiempos.
+  wilcoxon.py              - Test estadístico de Wilcoxon.
 
 - generar_graficas.sh
-  Script bash que lanza todos los scripts Python anteriores en orden.
-  Equivale a ejecutarlos uno a uno.
+  Script bash que lanza los scripts Python de P3 en orden.
 
 - config.txt
   Fichero de configuración opcional. Permite cambiar sin recompilar:
-  lambda, num_ejecuciones, eval_random, eval_bl, eval_greedy, eval_ag,
-  eval_am y semilla_inicial.
-  Valores por defecto: lambda=500, num_ejecuciones=50, eval_*=10000,
-  eval_greedy=1, semilla_inicial=42.
+  lambda, número de ejecuciones, presupuestos, iteraciones, semilla y
+  parámetros del ES.
 
 - CMakeLists.txt
   Fichero de configuración para compilar el proyecto con CMake.
@@ -106,13 +95,16 @@ Contenido de la carpeta software
 Compilación
 -----------
 
-Opción 1 - Compilación directa (recomendada):
+Opción 1 - Compilación directa:
 
   g++ -std=c++17 -O3 main.cpp src/*.cpp -Iinc -Icommon -o main
 
 Opción 2 - Con CMake:
 
-  mkdir build && cd build && cmake .. && make
+  mkdir -p build
+  cd build
+  cmake ..
+  make
 
 
 Ejecución
@@ -120,8 +112,8 @@ Ejecución
 
 Ejecutar siempre desde la carpeta software, ya que las rutas son relativas:
 
-  ./main                 # parámetros por defecto
-  ./main config.txt      # con fichero de configuración
+  ./main
+  ./main config.txt
 
 Con CMake, ejecutando también desde la carpeta software:
 
@@ -138,13 +130,13 @@ Tras ejecutar el programa principal, generar todas las gráficas con:
 
 O ejecutar cada script por separado:
 
-  python3 scripts/boxplots.py             # boxplots por dataset
-  python3 scripts/convergencia.py         # curvas de convergencia
-  python3 scripts/sensibilidad_alpha.py   # sensibilidad del parametro alpha
-  python3 scripts/torneo_k.py             # sensibilidad del tamaño de torneo
-  python3 scripts/tiempos.py              # comparativa de tiempos
-  python3 scripts/boxplots_cruces.py      # comparativa de cruces
-  python3 scripts/boxplots_am_extra.py    # variantes memeticas extra
-  python3 scripts/wilcoxon.py             # test estadistico de Wilcoxon
+  python3 scripts/boxplots.py
+  python3 scripts/convergencia.py
+  python3 scripts/boxplot_grasp.py
+  python3 scripts/boxplot_ils.py
+  python3 scripts/sensibilidad_es_phi.py
+  python3 scripts/sensibilidad_es_mu.py
+  python3 scripts/tiempos.py
+  python3 scripts/wilcoxon.py
 
 Las imágenes se guardan en graficas/.
