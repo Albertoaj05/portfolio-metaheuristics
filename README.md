@@ -40,6 +40,21 @@ What the numbers say:
 
 Differences were checked with Wilcoxon signed-rank tests over the 50 runs (`resultados/wilcoxon.csv`); BMB and ILS-BL beat simulated annealing with p < 10⁻¹⁴ on all three datasets.
 
+## Genetic and memetic algorithms (P2)
+
+Before choosing AM-Best for the final comparison, P2 compared generational (AGG) and steady-state (AGE) genetic algorithms with arithmetic and BLX crossover, and three memetic variants that apply local search to all individuals (AM-All), a random 10% (AM-Rand) or the best 10% (AM-Best). Mean training fitness over 50 runs:
+
+| Algorithm | IBEX 35 | S&P 100 | S&P 500 |
+|---|---:|---:|---:|
+| AM-Best | **−4.490** | **−2.815** | **−2.755** |
+| AM-Rand | −4.490 | −2.822 | −2.760 |
+| AGG-BLX | −4.502 | −2.885 | −2.813 |
+| AGE-BLX | −4.509 | −2.968 | −3.079 |
+| AM-All | −4.587 | −3.117 | −3.209 |
+| AGG-Arithmetic | −4.671 | −3.141 | −3.001 |
+
+BLX crossover beats arithmetic crossover in every case, and local search helps only when it is applied selectively: running it on the whole population (AM-All) spends the evaluation budget and ends up worse than the plain GA. Results and figures are in `resultados/p2/` and `graficas/p2/`.
+
 ## Build and run
 
 Requires CMake and a C++17 compiler; the plots need Python 3 with pandas, matplotlib, seaborn and scipy.
@@ -66,4 +81,4 @@ docs/          reports for P1, P2 and P3 (Spanish)
 datos_portfolio_2526/   daily returns 2015–2025 provided with the assignment
 ```
 
-Code comments and reports are in Spanish. The history of this repository follows the three deliveries: P1 (local search), P2 (genetic and memetic algorithms) and P3 (multi-start, ILS, simulated annealing and GRASP).
+Code comments and reports are in Spanish. The same course also produced [woa-cec2017](https://github.com/Albertoaj05/woa-cec2017), a continuous-optimization study on the CEC2017 benchmark. The history of this repository follows the three deliveries: P1 (local search), P2 (genetic and memetic algorithms) and P3 (multi-start, ILS, simulated annealing and GRASP).
